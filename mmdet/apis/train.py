@@ -8,6 +8,7 @@ from mmcv.runner import (HOOKS, DistSamplerSeedHook, EpochBasedRunner,
                          Fp16OptimizerHook, OptimizerHook, build_optimizer,
                          build_runner)
 from mmcv.utils import build_from_cfg
+from torch.cuda import amp
 
 from mmdet.core import DistEvalHook, EvalHook
 from mmdet.datasets import (build_dataloader, build_dataset,
@@ -17,7 +18,8 @@ from mmcv_custom.runner import EpochBasedRunnerAmp
 try:
     import apex
 except:
-    print('apex is not installed')
+    # print('apex is not installed')
+    pass  # TODO : Yes, we know apex is not installed...
 
 
 def set_random_seed(seed, deterministic=False):
@@ -81,11 +83,14 @@ def train_detector(model,
     # use apex fp16 optimizer
     if cfg.optimizer_config.get("type", None) and cfg.optimizer_config["type"] == "DistOptimizerHook":
         if cfg.optimizer_config.get("use_fp16", False):
-            model, optimizer = apex.amp.initialize(
-                model.cuda(), optimizer, opt_level="O1")
-            for m in model.modules():
-                if hasattr(m, "fp16_enabled"):
-                    m.fp16_enabled = True
+            print('use apex fp16 optimizer')
+            # model, optimizer = apex.amp.initialize(
+            #     model.cuda(), optimizer, opt_level="O1")
+            with amp.autocast():
+                model, optimizer = model.cuda(), optimizer
+                for m in model.modules():
+                    if hasattr(m, "fp16_enabled"):
+                        m.fp16_enabled = True
 
     # put model on gpus
     if distributed:

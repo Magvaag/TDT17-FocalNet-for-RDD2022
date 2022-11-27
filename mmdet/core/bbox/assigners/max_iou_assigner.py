@@ -153,7 +153,7 @@ class MaxIoUAssigner(BaseAssigner):
             else:
                 assigned_labels = overlaps.new_full((num_bboxes, ),
                                                     -1,
-                                                    dtype=torch.long)
+                                                    dtype=gt_labels.dtype)  # TODO : Originally torch.long
             return AssignResult(
                 num_gts,
                 assigned_gt_inds,
@@ -203,6 +203,11 @@ class MaxIoUAssigner(BaseAssigner):
             pos_inds = torch.nonzero(
                 assigned_gt_inds > 0, as_tuple=False).squeeze()
             if pos_inds.numel() > 0:
+                # print('pos_inds', pos_inds)
+                # print('assigned_gt_inds[pos_inds]', assigned_gt_inds[pos_inds])
+                # print('assigned_labels[pos_inds]', assigned_labels[pos_inds])
+                # print('gt_labels[assigned_gt_inds[pos_inds] - 1]', gt_labels[assigned_gt_inds[pos_inds] - 1])
+
                 assigned_labels[pos_inds] = gt_labels[
                     assigned_gt_inds[pos_inds] - 1]
         else:

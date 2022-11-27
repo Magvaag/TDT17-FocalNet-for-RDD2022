@@ -215,3 +215,34 @@ def show_result_pyplot(model,
         win_name=title,
         bbox_color=(72, 101, 241),
         text_color=(72, 101, 241))
+
+
+def show_annot_pyplot(model,
+                      img,
+                      result,
+                      score_thr=0.3,
+                      title='result',
+                      wait_time=0):
+    """Visualize the detection results on the image.
+
+    Args:
+        model (nn.Module): The loaded detector.
+        img (str or np.ndarray): Image filename or loaded image.
+        result (tuple[list] or list): The detection result, can be either
+            (bbox, segm) or just bbox.
+        score_thr (float): The threshold to visualize the bboxes and masks.
+        title (str): Title of the pyplot figure.
+        wait_time (float): Value of waitKey param.
+                Default: 0.
+    """
+    if hasattr(model, 'module'):
+        model = model.module
+    model.show_result(
+        img,
+        result,
+        score_thr=score_thr,
+        show=True,
+        wait_time=wait_time,
+        win_name=title,
+        bbox_color=(0, 0, 241),
+        text_color=(0, 0, 241))

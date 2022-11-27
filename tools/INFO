@@ -1,0 +1,47 @@
+2022-11-22 01:20:27,034 - mmdet - INFO - Start running, host: Magnus@DESKTOP-JJROIE8, work_dir: C:\Users\Magnus\Documents\Programming\Python\FocalNetTests\P1\Swin-Transformer-Object-Detection\checkpoints\runs
+2022-11-22 01:20:27,034 - mmdet - INFO - Hooks will be executed in the following order:
+before_run:
+(VERY_HIGH   ) StepLrUpdaterHook                  
+(ABOVE_NORMAL) DistOptimizerHook                  
+(NORMAL      ) CheckpointHook                     
+(VERY_LOW    ) TextLoggerHook                     
+ -------------------- 
+before_train_epoch:
+(VERY_HIGH   ) StepLrUpdaterHook                  
+(NORMAL      ) NumClassCheckHook                  
+(LOW         ) IterTimerHook                      
+(VERY_LOW    ) TextLoggerHook                     
+ -------------------- 
+before_train_iter:
+(VERY_HIGH   ) StepLrUpdaterHook                  
+(LOW         ) IterTimerHook                      
+ -------------------- 
+after_train_iter:
+(ABOVE_NORMAL) DistOptimizerHook                  
+(NORMAL      ) CheckpointHook                     
+(LOW         ) IterTimerHook                      
+(VERY_LOW    ) TextLoggerHook                     
+ -------------------- 
+after_train_epoch:
+(NORMAL      ) CheckpointHook                     
+(VERY_LOW    ) TextLoggerHook                     
+ -------------------- 
+before_val_epoch:
+(NORMAL      ) NumClassCheckHook                  
+(LOW         ) IterTimerHook                      
+(VERY_LOW    ) TextLoggerHook                     
+ -------------------- 
+before_val_iter:
+(LOW         ) IterTimerHook                      
+ -------------------- 
+after_val_iter:
+(LOW         ) IterTimerHook                      
+ -------------------- 
+after_val_epoch:
+(VERY_LOW    ) TextLoggerHook                     
+ -------------------- 
+after_run:
+(VERY_LOW    ) TextLoggerHook                     
+ -------------------- 
+2022-11-22 01:20:27,034 - mmdet - INFO - workflow: [('train', 1)], max: 36 epochs
+2022-11-22 01:20:27,035 - mmdet - INFO - Checkpoints will be saved to C:\Users\Magnus\Documents\Programming\Python\FocalNetTests\P1\Swin-Transformer-Object-Detection\checkpoints\runs by HardDiskBackend.

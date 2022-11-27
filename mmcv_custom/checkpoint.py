@@ -304,6 +304,10 @@ def load_checkpoint(model,
         dict or OrderedDict: The loaded checkpoint.
     """
     checkpoint = _load_checkpoint(filename, map_location)
+
+    # remove visual. from checkpoint key
+    checkpoint = {key.replace('visual.', ''):val for key, val in checkpoint.items()}
+
     # OrderedDict is a subclass of dict
     if not isinstance(checkpoint, dict):
         raise RuntimeError(
@@ -313,46 +317,94 @@ def load_checkpoint(model,
         state_dict = checkpoint['state_dict']
     elif 'model' in checkpoint:
         state_dict = checkpoint['model']
+    elif 'teacher' in checkpoint: 
+        print('teacher model is loaded')
+        state_dict = checkpoint['teacher']
     else:
-        state_dict = checkpoint
+        state_dict = checkpoint    
+
     # strip prefix of state_dict
     if list(state_dict.keys())[0].startswith('module.'):
         state_dict = {k[7:]: v for k, v in state_dict.items()}
 
-    # for MoBY, load model of online branch
-    if sorted(list(state_dict.keys()))[0].startswith('encoder'):
-        state_dict = {k.replace('encoder.', ''): v for k, v in state_dict.items() if k.startswith('encoder.')}
-
-    # reshape absolute position embedding
-    if state_dict.get('absolute_pos_embed') is not None:
-        absolute_pos_embed = state_dict['absolute_pos_embed']
-        N1, L, C1 = absolute_pos_embed.size()
-        N2, C2, H, W = model.absolute_pos_embed.size()
-        if N1 != N2 or C1 != C2 or L != H*W:
-            logger.warning("Error in loading absolute_pos_embed, pass")
-        else:
-            state_dict['absolute_pos_embed'] = absolute_pos_embed.view(N2, H, W, C2).permute(0, 3, 1, 2)
-
-    # interpolate position bias table if needed
-    relative_position_bias_table_keys = [k for k in state_dict.keys() if "relative_position_bias_table" in k]
-    for table_key in relative_position_bias_table_keys:
+    focal_layers_keys = [k for k in state_dict.keys() if ("focal_layers" in k and 'bias' not in k)]
+    for table_key in focal_layers_keys:        
+        if table_key not in model.state_dict():
+            continue
         table_pretrained = state_dict[table_key]
         table_current = model.state_dict()[table_key]
-        L1, nH1 = table_pretrained.size()
-        L2, nH2 = table_current.size()
-        if nH1 != nH2:
-            logger.warning(f"Error in loading {table_key}, pass")
-        else:
+
+        if len(table_pretrained.shape) != 4:
+            L1 = table_pretrained.shape[1]
+            L2 = table_current.shape[1]
+
             if L1 != L2:
                 S1 = int(L1 ** 0.5)
                 S2 = int(L2 ** 0.5)
                 table_pretrained_resized = F.interpolate(
-                     table_pretrained.permute(1, 0).view(1, nH1, S1, S1),
-                     size=(S2, S2), mode='bicubic')
-                state_dict[table_key] = table_pretrained_resized.view(nH2, L2).permute(1, 0)
+                        table_pretrained.view(1, 1, S1, S1),
+                        size=(S2, S2), mode='bicubic')
+                state_dict[table_key] = table_pretrained_resized.view(1, L2) * L1 / L2
+        else:
+            fsize1 = table_pretrained.shape[2]
+            fsize2 = table_current.shape[2]
+
+            # NOTE: different from interpolation used in self-attention, we use padding or clipping for focal conv
+            if fsize1 < fsize2:
+                table_pretrained_resized = torch.zeros(table_current.shape)
+                table_pretrained_resized[:, :, (fsize2-fsize1)//2:-(fsize2-fsize1)//2, (fsize2-fsize1)//2:-(fsize2-fsize1)//2] = table_pretrained
+                state_dict[table_key] = table_pretrained_resized
+            elif fsize1 > fsize2:
+                table_pretrained_resized = table_pretrained[:, :, (fsize1-fsize2)//2:-(fsize1-fsize2)//2, (fsize1-fsize2)//2:-(fsize1-fsize2)//2]
+                state_dict[table_key] = table_pretrained_resized
+
+    f_layers_keys = [k for k in state_dict.keys() if ("modulation.f" in k)]
+    for table_key in f_layers_keys:        
+        if table_key not in model.state_dict():
+            continue
+        table_pretrained = state_dict[table_key]
+        table_current = model.state_dict()[table_key]
+        if table_pretrained.shape != table_current.shape:
+            if len(table_pretrained.shape) == 2:
+                # for linear weights
+                dim = table_pretrained.shape[1]
+                assert table_current.shape[1] == dim
+                L1 = table_pretrained.shape[0]
+                L2 = table_current.shape[0]
+
+                if L1 < L2:
+                    table_pretrained_resized = torch.zeros(table_current.shape)
+                    # copy for linear project
+                    table_pretrained_resized[:2*dim] = table_pretrained[:2*dim]
+                    # copy for global token gating
+                    table_pretrained_resized[-1] = table_pretrained[-1]
+                    # copy for first multiple focal levels
+                    table_pretrained_resized[2*dim:2*dim+(L1-2*dim-1)] = table_pretrained[2*dim:-1]
+                    # reassign pretrained weights
+                    state_dict[table_key] = table_pretrained_resized
+                elif L1 > L2:
+                    raise NotImplementedError
+            elif len(table_pretrained.shape) == 1:
+                # for linear bias
+                L1 = table_pretrained.shape[0]
+                L2 = table_current.shape[0]
+                if L1 < L2:
+                    table_pretrained_resized = torch.zeros(table_current.shape)
+                    # copy for linear project
+                    table_pretrained_resized[:2*dim] = table_pretrained[:2*dim]
+                    # copy for global token gating
+                    table_pretrained_resized[-1] = table_pretrained[-1]
+                    # copy for first multiple focal levels
+                    table_pretrained_resized[2*dim:2*dim+(L1-2*dim-1)] = table_pretrained[2*dim:-1]
+                    # reassign pretrained weights
+                    state_dict[table_key] = table_pretrained_resized
+                elif L1 > L2:
+                    raise NotImplementedError                                    
+
 
     # load state_dict
     load_state_dict(model, state_dict, strict, logger)
+
     return checkpoint
 
 
